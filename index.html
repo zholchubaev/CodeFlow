@@ -1,27 +1,25 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="red">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeFlow — Интерактивная платформа обучения</title>
-    
-    <!-- Иконка вкладки браузера (Favicon) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ef4444'><path d='M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z'/></svg>">
-
-    <!-- Подключаем Tailwind CSS и React -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Подключаем наш отдельный файл стилей -->
+    <title>CodeFlow — Платформа обучения программированию</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
-
     <div id="root"></div>
 
-    <!-- Подключаем наш отдельный файл логики React -->
+    <script>
+        // Сразу применяем сохранённую тему до отрисовки React
+        const initialTheme = localStorage.getItem('codeflow_theme') || 'red';
+        document.documentElement.setAttribute('data-theme', initialTheme);
+    </script>
+
     <script type="text/babel" src="app.js"></script>
 </body>
 </html>
