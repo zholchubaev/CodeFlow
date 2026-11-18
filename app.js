@@ -1,6 +1,5 @@
 const { useState, useEffect } = React;
 
-// БАЗА ЗНАНИЙ: 6 КУРСОВ ПО 10 УРОВНЕЙ С ДЕТАЛЬНЫМ РАЗБОРОМ СЛОВ СЛЕВА
 const COURSES_DATA = [
     {
         id: 'js',
@@ -22,7 +21,7 @@ const COURSES_DATA = [
                     { word: 'log()', meaning: 'Метод, который печатает переданные данные на экран.' },
                     { word: 'Кавычки (" ")', meaning: 'Обозначают тип данных "строка" (текст).' }
                 ],
-                task: 'Выведи в консоль фразу "Привет, мир!"',
+                task: 'Выведи в консоль фразу "Кума Амбаш)"',
                 starterCode: 'console.log("Привет, мир!");',
                 check: (code, out) => out.includes('Привет, мир!')
             },
@@ -63,7 +62,7 @@ const COURSES_DATA = [
                 ],
                 task: 'Объяви let points = 10, затем увеличь points на 5 (points = points + 5) и выведи.',
                 starterCode: 'let points = 10;\npoints = points + 5;\nconsole.log(points);',
-                check: (code, out) => out.includes('let') && out.includes('15')
+                check: (code, out) => code.includes('let') && out.includes('15')
             },
             {
                 id: 'js-5',
@@ -878,15 +877,26 @@ const COURSES_DATA = [
 ];
 
 function App() {
-    const [activeView, setActiveView] = useState('catalog');
+    const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('codeflow_user') || '');
+    const [userHasPhoto, setUserHasPhoto] = useState(() => localStorage.getItem('codeflow_has_photo') === 'true');
+    const [showAuthModal, setShowAuthModal] = useState(!localStorage.getItem('codeflow_user'));
+    const [loginNameInput, setLoginNameInput] = useState('');
+
+    const [theme, setTheme] = useState(() => localStorage.getItem('codeflow_theme') || 'red');
+
+    const [activeTab, setActiveTab] = useState('courses'); 
+    const [activeView, setActiveView] = useState('catalog'); 
     const [currentCourse, setCurrentCourse] = useState(COURSES_DATA[0]);
     const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
     const [code, setCode] = useState('');
     const [output, setOutput] = useState('');
     const [isSuccess, setIsSuccess] = useState(false);
+
     const [completedLessons, setCompletedLessons] = useState(() => {
+        const u = localStorage.getItem('codeflow_user');
+        if (!u) return [];
         try {
-            return JSON.parse(localStorage.getItem('codeflow_progress')) || [];
+            return JSON.parse(localStorage.getItem(`codeflow_progress_${u}`)) || [];
         } catch {
             return [];
         }
@@ -895,8 +905,57 @@ function App() {
     const activeLesson = currentCourse.lessons[currentLessonIdx];
 
     useEffect(() => {
-        localStorage.setItem('codeflow_progress', JSON.stringify(completedLessons));
-    }, [completedLessons]);
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('codeflow_theme', theme);
+    }, [theme]);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        localStorage.setItem(`codeflow_progress_${currentUser}`, JSON.stringify(completedLessons));
+
+        try {
+            const students = JSON.parse(localStorage.getItem('codeflow_students') || '{}');
+            students[currentUser] = {
+                name: currentUser,
+                hasPhoto: userHasPhoto,
+                completed: completedLessons.length,
+                xp: completedLessons.length * 10,
+                lastActive: new Date().toLocaleDateString('ru-RU')
+            };
+            localStorage.setItem('codeflow_students', JSON.stringify(students));
+        } catch (e) {
+            console.error('Storage quota safe fallback', e);
+        }
+    }, [completedLessons, currentUser, userHasPhoto]);
+
+    const completeAuth = () => {
+        const cleanName = loginNameInput.trim();
+        if (!cleanName) {
+            alert('Пожалуйста, введите свой никнейм!');
+            return;
+        }
+
+        localStorage.setItem('codeflow_user', cleanName);
+        setCurrentUser(cleanName);
+
+        let savedProgress = [];
+        try {
+            savedProgress = JSON.parse(localStorage.getItem(`codeflow_progress_${cleanName}`)) || [];
+        } catch {
+            savedProgress = [];
+        }
+
+        setCompletedLessons(savedProgress);
+        setShowAuthModal(false);
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('codeflow_user');
+        setCurrentUser('');
+        setUserHasPhoto(false);
+        setLoginNameInput('');
+        setShowAuthModal(true);
+    };
 
     const openCourse = (course, lessonIndex = 0) => {
         setCurrentCourse(course);
@@ -905,6 +964,7 @@ function App() {
         setOutput('');
         setIsSuccess(false);
         setActiveView('workspace');
+        setActiveTab('courses');
     };
 
     const selectLesson = (idx) => {
@@ -964,105 +1024,214 @@ function App() {
             selectLesson(currentLessonIdx + 1);
         } else {
             setActiveView('catalog');
+            setActiveTab('courses');
         }
     };
 
     const totalLessonsCount = COURSES_DATA.reduce((acc, c) => acc + c.lessons.length, 0);
+    const themeLabels = {
+        red: { name: 'Красная', color: '#ef4444' },
+        purple: { name: 'Фиолетовая', color: '#8b5cf6' },
+        emerald: { name: 'Изумрудная', color: '#10b981' },
+        light: { name: 'Светлая', color: '#2563eb' }
+    };
 
     return (
-        <div className="min-h-screen flex flex-col selection:bg-red-500 selection:text-white">
+        <div className="min-h-screen flex flex-col theme-bg-main theme-text-main">
             
-            {/* ШАПКА САЙТА */}
-            <header className="sticky top-0 z-50 backdrop-blur-md bg-zinc-950/85 border-b border-zinc-800/80">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <div 
-                        className="flex items-center space-x-3 cursor-pointer group" 
-                        onClick={() => setActiveView('catalog')}
-                    >
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center glow-red group-hover:scale-105 transition-transform">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+            {showAuthModal && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="w-full max-w-md p-8 rounded-3xl theme-bg-card border theme-border shadow-2xl text-center">
+                        <h2 className="text-3xl font-black mb-2">
+                            Code<span className="theme-accent-text">Flow</span>
+                        </h2>
+                        <p className="theme-text-muted text-sm mb-6">
+                            Введите свой никнейм для сохранения прогресса и участия в рейтинге.
+                        </p>
+
+                        <div className="space-y-4">
+                            <input 
+                                type="text"
+                                value={loginNameInput}
+                                onChange={(e) => setLoginNameInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && completeAuth()}
+                                placeholder="Ваш никнейм..."
+                                className="w-full px-4 py-3.5 rounded-xl theme-bg-code border theme-border theme-text-main text-base focus:outline-none"
+                                autoFocus
+                            />
+                            <button 
+                                type="button"
+                                onClick={completeAuth}
+                                className="w-full py-3.5 rounded-xl theme-accent-bg font-bold text-base shadow-lg transition-all"
+                            >
+                                Войти на платформу
+                            </button>
                         </div>
-                        <span className="text-xl font-extrabold tracking-tight text-white">
-                            Code<span className="text-red-500">Flow</span>
-                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* АДАПТИВНАЯ РЕЗИНОВАЯ ШАПКА */}
+            <header className="sticky top-0 z-40 backdrop-blur-md theme-bg-header border-b theme-border">
+                <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+                    
+                    <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+                        <div 
+                            className="flex items-center gap-2 cursor-pointer group shrink-0" 
+                            onClick={() => { setActiveView('catalog'); setActiveTab('courses'); }}
+                        >
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl theme-accent-bg flex items-center justify-center glow-accent group-hover:scale-105 transition-transform">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                </svg>
+                            </div>
+                            <span className="text-lg sm:text-xl font-extrabold tracking-tight truncate">
+                                Code<span className="theme-accent-text">Flow</span>
+                            </span>
+                        </div>
+
+                        {/* Навигация (на мобилках сжимается компактно, на ПК полная) */}
+                        <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1 scrollbar-none">
+                            <button 
+                                onClick={() => { setActiveTab('courses'); setActiveView('catalog'); }}
+                                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all shrink-0 ${
+                                    activeTab === 'courses' && activeView === 'catalog'
+                                        ? 'theme-accent-soft' 
+                                        : 'border-transparent theme-text-muted hover:opacity-80'
+                                }`}
+                            >
+                                Курсы
+                            </button>
+                            <button 
+                                onClick={() => openCourse(currentCourse, currentLessonIdx)}
+                                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all shrink-0 ${
+                                    activeTab === 'courses' && activeView === 'workspace'
+                                        ? 'theme-accent-soft' 
+                                        : 'border-transparent theme-text-muted hover:opacity-80'
+                                }`}
+                            >
+                                Тренажер
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('leaderboard')}
+                                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all shrink-0 ${
+                                    activeTab === 'leaderboard'
+                                        ? 'theme-accent-soft' 
+                                        : 'border-transparent theme-text-muted hover:opacity-80'
+                                }`}
+                            >
+                                🏆 Рейтинг
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('profile')}
+                                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all shrink-0 ${
+                                    activeTab === 'profile'
+                                        ? 'theme-accent-soft' 
+                                        : 'border-transparent theme-text-muted hover:opacity-80'
+                                }`}
+                            >
+                                👤 Профиль
+                            </button>
+                        </nav>
                     </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-4">
-                        <button 
-                            onClick={() => setActiveView('catalog')}
-                            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeView === 'catalog' ? 'bg-red-600/15 text-red-400 border border-red-500/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
-                        >
-                            Все курсы
-                        </button>
-                        <button 
-                            onClick={() => openCourse(currentCourse, currentLessonIdx)}
-                            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeView === 'workspace' ? 'bg-red-600/15 text-red-400 border border-red-500/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
-                        >
-                            Тренажер
-                        </button>
-                        <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                            <span>Пройдено: <strong className="text-white">{completedLessons.length} / {totalLessonsCount}</strong></span>
+                    {/* Правая часть: Меню тем и профиль видны ВСЕГДА на любых экранах */}
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        <div className="theme-dropdown">
+                            <button type="button" className="theme-dropdown-trigger">
+                                <span className="theme-dot" style={{ backgroundColor: themeLabels[theme]?.color }}></span>
+                                <span className="text-xs sm:text-sm">Тема</span>
+                                <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div className="theme-dropdown-menu">
+                                <button type="button" className="theme-option" onClick={() => setTheme('red')}>
+                                    <span className="theme-dot" style={{ background: '#ef4444' }}></span>
+                                    <span>Красная</span>
+                                </button>
+                                <button type="button" className="theme-option" onClick={() => setTheme('purple')}>
+                                    <span className="theme-dot" style={{ background: '#8b5cf6' }}></span>
+                                    <span>Фиолетовая</span>
+                                </button>
+                                <button type="button" className="theme-option" onClick={() => setTheme('emerald')}>
+                                    <span className="theme-dot" style={{ background: '#10b981' }}></span>
+                                    <span>Изумрудная</span>
+                                </button>
+                                <button type="button" className="theme-option" onClick={() => setTheme('light')}>
+                                    <span className="theme-dot" style={{ background: '#ffffff', border: '1px solid #94a3b8' }}></span>
+                                    <span>Светлая</span>
+                                </button>
+                            </div>
                         </div>
+
+                        {currentUser && (
+                            <div 
+                                onClick={() => setActiveTab('profile')}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl theme-bg-code border theme-border cursor-pointer hover:opacity-90 max-w-[140px] sm:max-w-none"
+                            >
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full theme-accent-bg flex items-center justify-center text-[10px] sm:text-xs font-bold shrink-0">
+                                    {currentUser[0].toUpperCase()}
+                                </div>
+                                <span className="text-xs font-bold truncate">{currentUser}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
 
-            {/* ЭКРАН 1: КАТАЛОГ КУРСОВ */}
-            {activeView === 'catalog' && (
-                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+            {activeTab === 'courses' && activeView === 'catalog' && (
+                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     
-                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-red-950/20 border border-zinc-800 p-8 sm:p-12 mb-12 glow-red">
-                        <div className="absolute -top-24 -right-24 w-96 h-96 bg-red-600/15 rounded-full blur-3xl pointer-events-none"></div>
-                        
+                    <div className="relative overflow-hidden rounded-3xl theme-bg-card border theme-border p-6 sm:p-12 mb-12 glow-accent">
                         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                             <div className="lg:col-span-7">
-                                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold mb-5">
+                                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full theme-accent-soft border text-xs font-semibold mb-5">
                                     <span>🔥 60 уровней с детальным словарем терминов слева</span>
                                 </div>
-                                <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4 text-white leading-tight">
-                                    Учись программировать <span className="text-red-500">с полным разбором</span>
+                                <h1 className="text-2xl sm:text-5xl font-extrabold tracking-tight mb-4 leading-tight">
+                                    Учись программировать <span className="theme-accent-text">с полным разбором</span>
                                 </h1>
-                                <p className="text-zinc-400 text-base sm:text-lg mb-8 leading-relaxed">
+                                <p className="theme-text-muted text-sm sm:text-lg mb-8 leading-relaxed">
                                     Никакой путаницы: в каждом из 6 курсов по 10 уровней с нарастающей сложностью. Во время решения в левой колонке всегда доступен детальный словарь каждого слова и термина.
                                 </p>
                                 <div className="flex flex-wrap gap-4">
                                     <button 
                                         onClick={() => openCourse(COURSES_DATA[0], 0)}
-                                        className="px-6 py-3.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold shadow-lg shadow-red-600/30 transition-all glow-red-hover"
+                                        className="px-6 py-3.5 rounded-xl theme-accent-bg font-semibold shadow-lg transition-all text-sm sm:text-base"
                                     >
                                         Начать обучение →
                                     </button>
                                     {completedLessons.length > 0 && (
                                         <button 
-                                            onClick={() => { setCompletedLessons([]); localStorage.removeItem('codeflow_progress'); }}
-                                            className="px-5 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 text-sm font-medium transition-all"
+                                            onClick={() => setCompletedLessons([])}
+                                            className="px-5 py-3.5 rounded-xl theme-bg-code border theme-border theme-text-muted hover:opacity-80 text-xs sm:text-sm font-medium transition-all"
                                         >
-                                            Сбросить прогресс
+                                            Сбросить мой прогресс
                                         </button>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="hidden lg:block lg:col-span-5 animate-float">
-                                <div className="rounded-2xl bg-zinc-950/90 border border-red-500/30 p-5 shadow-2xl shadow-red-950/40 backdrop-blur-sm">
-                                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-800">
+                            <div className="hidden lg:block lg:col-span-5">
+                                <div className="rounded-2xl theme-bg-code border theme-border p-5 shadow-2xl">
+                                    <div className="flex items-center justify-between pb-3 mb-3 border-b theme-border">
                                         <div className="flex space-x-1.5">
                                             <span className="w-3 h-3 rounded-full bg-red-500"></span>
                                             <span className="w-3 h-3 rounded-full bg-amber-500"></span>
                                             <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
                                         </div>
-                                        <span className="text-xs font-mono text-zinc-500">dictionary.js</span>
+                                        <span className="text-xs font-mono theme-text-muted">dictionary.js</span>
                                     </div>
-                                    <pre className="font-mono text-xs sm:text-sm leading-relaxed text-zinc-300">
+                                    <pre className="font-mono text-xs sm:text-sm leading-relaxed">
                                         <code>
-                                            <span className="text-red-400">const</span> explanation = {'{\n'}
-                                            {'  '}term: <span className="text-amber-300">'Map / Filter / Join'</span>,{'\n'}
+                                            <span className="theme-accent-text">const</span> explanation = {'{\n'}
+                                            {'  '}term: <span className="text-amber-400">'Map / Filter / Join'</span>,{'\n'}
                                             {'  '}clarity: <span className="text-emerald-400">'100%'</span>,{'\n'}
-                                            {'  '}understanding: <span className="text-red-400">true</span>{'\n'}
+                                            {'  '}understanding: <span className="theme-accent-text">true</span>{'\n'}
                                             {'};\n\n'}
-                                            <span className="text-zinc-500">// Разбор каждого слова слева</span>{'\n'}
-                                            <span className="text-rose-400">masterCode</span>();
+                                            <span className="theme-text-muted">// Разбор каждого слова слева</span>{'\n'}
+                                            <span className="theme-accent-text">masterCode</span>();
                                         </code>
                                     </pre>
                                 </div>
@@ -1070,8 +1239,8 @@ function App() {
                         </div>
                     </div>
 
-                    <h2 className="text-xl sm:text-2xl font-bold mb-6 text-white flex items-center space-x-3">
-                        <span className="w-2 h-6 bg-red-500 rounded-full"></span>
+                    <h2 className="text-xl sm:text-2xl font-bold mb-6 flex items-center space-x-3">
+                        <span className="w-2 h-6 theme-accent-bg rounded-full"></span>
                         <span>Выберите курс (по 10 уровней)</span>
                     </h2>
                     
@@ -1084,7 +1253,7 @@ function App() {
                                 <div 
                                     key={course.id}
                                     onClick={() => openCourse(course, 0)}
-                                    className="group relative bg-zinc-900/70 hover:bg-zinc-900 border border-zinc-800 hover:border-red-500/50 rounded-2xl p-6 transition-all duration-300 cursor-pointer glow-red-hover flex flex-col justify-between"
+                                    className="group relative theme-bg-card border theme-border rounded-2xl p-6 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:shadow-xl"
                                 >
                                     <div>
                                         <div className="flex items-center justify-between mb-5">
@@ -1095,26 +1264,26 @@ function App() {
                                                     className="w-full h-full object-contain drop-shadow"
                                                 />
                                             </div>
-                                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${isAllDone ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-zinc-800/80 text-zinc-300 border-zinc-700'}`}>
+                                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${isAllDone ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'theme-bg-code theme-text-muted theme-border'}`}>
                                                 {isAllDone ? '🏆 Пройдено' : `${doneCount} / 10 уровней`}
                                             </span>
                                         </div>
-                                        <h3 className="text-lg font-bold text-white mb-2 group-hover:text-red-400 transition-colors">
+                                        <h3 className="text-lg font-bold mb-2">
                                             {course.title}
                                         </h3>
-                                        <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+                                        <p className="text-sm theme-text-muted mb-6 leading-relaxed">
                                             {course.desc}
                                         </p>
                                     </div>
                                     
                                     <div>
-                                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-4">
+                                        <div className="w-full h-1.5 theme-bg-code rounded-full overflow-hidden mb-4">
                                             <div 
-                                                className="h-full bg-red-500 transition-all duration-500"
+                                                className="h-full theme-accent-bg transition-all duration-500"
                                                 style={{ width: `${(doneCount / course.lessons.length) * 100}%` }}
                                             ></div>
                                         </div>
-                                        <div className="flex items-center justify-between text-sm font-semibold text-red-400">
+                                        <div className="flex items-center justify-between text-sm font-semibold theme-accent-text">
                                             <span>Открыть 10 уровней</span>
                                             <span className="transform group-hover:translate-x-1 transition-transform">→</span>
                                         </div>
@@ -1126,23 +1295,22 @@ function App() {
                 </main>
             )}
 
-            {/* ЭКРАН 2: ИНТЕРАКТИВНЫЙ ТРЕНАЖЕР СО СЛОВАРЕМ СЛЕВА */}
-            {activeView === 'workspace' && (
-                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 animate-fade-in">
+            {activeTab === 'courses' && activeView === 'workspace' && (
+                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
                     
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-zinc-800">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b theme-border">
                         <div className="flex items-center space-x-3">
                             <button 
                                 onClick={() => setActiveView('catalog')}
-                                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 transition-colors"
+                                className="px-3 py-1.5 rounded-lg theme-bg-card border theme-border text-xs font-semibold hover:opacity-80"
                             >
                                 ← Назад
                             </button>
                             <img src={currentCourse.iconUrl} alt="" className="w-6 h-6 object-contain" />
-                            <h2 className="text-lg sm:text-xl font-bold text-white">{currentCourse.title}</h2>
+                            <h2 className="text-base sm:text-xl font-bold">{currentCourse.title}</h2>
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                        <div className="flex flex-wrap gap-1.5">
                             {currentCourse.lessons.map((lesson, idx) => {
                                 const isDone = completedLessons.includes(lesson.id);
                                 const isCurrent = idx === currentLessonIdx;
@@ -1150,12 +1318,12 @@ function App() {
                                     <button
                                         key={lesson.id}
                                         onClick={() => selectLesson(idx)}
-                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all flex items-center space-x-1 border ${
+                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${
                                             isCurrent 
-                                                ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-600/20' 
+                                                ? 'theme-accent-bg border-transparent shadow-md' 
                                                 : isDone
-                                                    ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30 hover:bg-emerald-900/40'
-                                                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+                                                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                                    : 'theme-bg-card theme-text-muted theme-border'
                                         }`}
                                     >
                                         <span>{isDone ? '✓' : idx + 1}</span>
@@ -1167,52 +1335,50 @@ function App() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         
-                        {/* Левая колонка: Теория, Задание И Словарь терминов */}
-                        <div className="lg:col-span-5 bg-zinc-900/70 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-between">
+                        <div className="lg:col-span-5 theme-bg-card border theme-border rounded-2xl p-6 flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-red-400">
+                                    <span className="text-xs font-bold uppercase tracking-wider theme-accent-text">
                                         Уровень {currentLessonIdx + 1} из 10
                                     </span>
-                                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-200">
+                                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full theme-bg-code border theme-border">
                                         {activeLesson.difficulty}
                                     </span>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-3">
+                                <h3 className="text-xl font-bold mb-3">
                                     {activeLesson.title}
                                 </h3>
                                 
-                                <div className="prose prose-invert text-sm text-zinc-300 leading-relaxed mb-4 bg-zinc-950/60 p-4 rounded-xl border border-zinc-800/80">
+                                <div className="text-sm theme-text-muted leading-relaxed mb-4 theme-bg-code p-4 rounded-xl border theme-border">
                                     {activeLesson.theory}
                                 </div>
 
-                                {/* СЛОВАРЬ ТЕРМИНОВ ДЛЯ ЭТОГО УРОВНЯ */}
                                 <div className="mb-6">
-                                    <div className="text-xs font-bold text-red-400 uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-                                        <span>📖 Словарь терминов и слов этого уровня:</span>
+                                    <div className="text-xs font-bold theme-accent-text uppercase tracking-wider mb-2.5">
+                                        📖 Словарь терминов и слов этого уровня:
                                     </div>
-                                    <div className="space-y-2 bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/80">
+                                    <div className="space-y-2 theme-bg-code p-3.5 rounded-xl border theme-border">
                                         {activeLesson.vocabulary.map((item, vIdx) => (
-                                            <div key={vIdx} className="text-xs leading-relaxed border-b border-zinc-900 pb-2 last:border-0 last:pb-0">
-                                                <code className="text-rose-400 font-bold font-mono px-1.5 py-0.5 bg-zinc-900 rounded">{item.word}</code>
-                                                <span className="text-zinc-400 ml-2">— {item.meaning}</span>
+                                            <div key={vIdx} className="text-xs leading-relaxed border-b theme-border pb-2 last:border-0 last:pb-0">
+                                                <code className="theme-accent-text font-bold font-mono px-1.5 py-0.5 theme-bg-card rounded">{item.word}</code>
+                                                <span className="theme-text-muted ml-2">— {item.meaning}</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 mb-6">
-                                    <div className="text-xs font-bold text-red-400 uppercase mb-1.5 flex items-center space-x-1.5">
-                                        <span>🎯 Практическое задание:</span>
+                                <div className="p-4 rounded-xl theme-accent-soft border mb-6">
+                                    <div className="text-xs font-bold uppercase mb-1.5">
+                                        🎯 Практическое задание:
                                     </div>
-                                    <p className="text-sm text-zinc-100 leading-relaxed">
+                                    <p className="text-sm theme-text-main leading-relaxed">
                                         {activeLesson.task}
                                     </p>
                                 </div>
                             </div>
 
                             {isSuccess && (
-                                <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 animate-fade-in">
+                                <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40">
                                     <div className="text-sm font-bold text-emerald-400 mb-2">
                                         🎉 Отлично! Уровень пройден.
                                     </div>
@@ -1226,28 +1392,27 @@ function App() {
                             )}
                         </div>
 
-                        {/* Правая колонка: Редактор и вывод */}
                         <div className="lg:col-span-7 flex flex-col space-y-4">
-                            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
-                                <div className="bg-zinc-900 px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+                            <div className="theme-bg-card border theme-border rounded-2xl overflow-hidden shadow-xl">
+                                <div className="theme-bg-code px-4 py-3 border-b theme-border flex items-center justify-between">
                                     <div className="flex items-center space-x-2">
                                         <span className="w-3 h-3 rounded-full bg-red-500"></span>
                                         <span className="w-3 h-3 rounded-full bg-amber-500"></span>
                                         <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-                                        <span className="ml-2 text-xs font-mono text-zinc-400">{currentCourse.fileName}</span>
+                                        <span className="ml-2 text-xs font-mono theme-text-muted">{currentCourse.fileName}</span>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <button 
                                             onClick={() => setCode(activeLesson.starterCode)}
-                                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+                                            className="px-3 py-1.5 rounded-lg theme-bg-card border theme-border text-xs font-medium hover:opacity-80"
                                         >
                                             Сбросить код
                                         </button>
                                         <button 
                                             onClick={runCode}
-                                            className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/30 transition-all flex items-center space-x-1.5"
+                                            className="px-4 py-1.5 rounded-lg theme-accent-bg text-xs font-bold shadow-md transition-all"
                                         >
-                                            <span>▶ Запустить и проверить</span>
+                                            ▶ Запустить и проверить
                                         </button>
                                     </div>
                                 </div>
@@ -1256,14 +1421,14 @@ function App() {
                                     value={code}
                                     onChange={(e) => setCode(e.target.value)}
                                     rows="10"
-                                    className="w-full p-4 bg-zinc-950 text-zinc-100 font-mono text-sm focus:outline-none resize-none leading-relaxed"
+                                    className="w-full p-4 theme-bg-code theme-text-main font-mono text-sm focus:outline-none resize-none leading-relaxed"
                                     spellCheck="false"
                                 ></textarea>
                             </div>
 
                             {currentCourse.type === 'html-live' ? (
-                                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden">
-                                    <div className="px-4 py-2 bg-zinc-900 border-b border-zinc-800 text-xs font-mono text-zinc-400 flex justify-between">
+                                <div className="theme-bg-card border theme-border rounded-2xl overflow-hidden">
+                                    <div className="px-4 py-2 theme-bg-code border-b theme-border text-xs font-mono theme-text-muted flex justify-between">
                                         <span>ЖИВОЙ БРАУЗЕР (РЕЗУЛЬТАТ ВЕРСТКИ)</span>
                                         {isSuccess && <span className="text-emerald-400">✓ Условие выполнено</span>}
                                     </div>
@@ -1274,8 +1439,8 @@ function App() {
                                     />
                                 </div>
                             ) : (
-                                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
-                                    <div className="text-xs font-mono text-zinc-500 mb-2 uppercase tracking-wider">
+                                <div className="theme-bg-card border theme-border rounded-2xl p-4">
+                                    <div className="text-xs font-mono theme-text-muted mb-2 uppercase tracking-wider">
                                         Вывод терминала:
                                     </div>
                                     <pre className={`font-mono text-sm whitespace-pre-wrap p-3.5 rounded-xl border min-h-[90px] ${
@@ -1283,7 +1448,7 @@ function App() {
                                             ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400' 
                                             : output.includes('❌') || output.includes('⚠️')
                                                 ? 'bg-red-950/20 border-red-500/30 text-red-400'
-                                                : 'bg-zinc-900/60 border-zinc-800 text-zinc-300'
+                                                : 'theme-bg-code theme-border theme-text-main'
                                     }`}>
                                         {output || 'Нажми «Запустить и проверить», чтобы выполнить код...'}
                                     </pre>
@@ -1294,11 +1459,66 @@ function App() {
                 </main>
             )}
 
-            {/* ФУТЕР */}
-            <footer className="border-t border-zinc-800/80 bg-zinc-950 mt-auto py-6">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500">
+            {activeTab === 'leaderboard' && (
+                <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-10">
+                    <div className="theme-bg-card border theme-border rounded-3xl p-6 sm:p-8 shadow-xl">
+                        <h2 className="text-2xl sm:text-3xl font-extrabold mb-2 text-center">🏆 Рейтинг учеников</h2>
+                        <p className="theme-text-muted text-center text-sm mb-8">
+                            Статистика всех зарегистрированных пользователей и их прогресс обучения.
+                        </p>
+
+                        <div className="space-y-3">
+                            {Object.values(JSON.parse(localStorage.getItem('codeflow_students') || '{}'))
+                                .sort((a, b) => b.xp - a.xp)
+                                .map((st, idx) => (
+                                    <div key={idx} className="flex items-center justify-between theme-bg-code p-4 rounded-2xl border theme-border">
+                                        <div className="flex items-center gap-4">
+                                            <span className="font-black text-lg theme-accent-text w-7">#{idx + 1}</span>
+                                            <div className="w-10 h-10 rounded-full theme-accent-soft border flex items-center justify-center font-bold">
+                                                {st.name[0].toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-base">{st.name}</div>
+                                                <div className="text-xs theme-text-muted">Активность: {st.lastActive || 'Сегодня'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-extrabold theme-accent-text text-lg">{st.xp} XP</div>
+                                            <div className="text-xs theme-text-muted">Уроков: {st.completed} / {totalLessonsCount}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    </div>
+                </main>
+            )}
+
+            {activeTab === 'profile' && (
+                <main className="flex-1 max-w-lg w-full mx-auto px-4 py-10">
+                    <div className="theme-bg-card border theme-border rounded-3xl p-8 shadow-xl text-center">
+                        <div className="w-28 h-28 rounded-full theme-accent-bg flex items-center justify-center text-4xl font-black mx-auto mb-6 shadow-lg">
+                            {currentUser ? currentUser[0].toUpperCase() : 'U'}
+                        </div>
+
+                        <h2 className="text-2xl font-black mb-1">{currentUser}</h2>
+                        <p className="theme-text-muted text-sm mb-6">
+                            Пройдено уроков: <strong>{completedLessons.length} из {totalLessonsCount}</strong> ({completedLessons.length * 10} XP)
+                        </p>
+
+                        <button 
+                            onClick={handleLogout}
+                            className="w-full py-3 rounded-xl border border-red-500/40 text-red-500 hover:bg-red-500/10 font-bold text-sm transition-all"
+                        >
+                            Выйти / Сменить аккаунт
+                        </button>
+                    </div>
+                </main>
+            )}
+
+            <footer className="border-t theme-border theme-bg-card mt-auto py-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs theme-text-muted gap-2">
                     <div>© 2026 CodeFlow — Интерактивная образовательная платформа By Zholchubaev Raatbek</div>
-                    <div className="mt-2 sm:mt-0 text-zinc-600">Работает локально на React + Tailwind CSS</div>
+                    <div>Работает локально на React + Tailwind CSS</div>
                 </div>
             </footer>
         </div>
